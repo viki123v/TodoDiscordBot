@@ -1,16 +1,24 @@
-from discord import Intents
+import discord
+import inspect
 from dotenv import load_dotenv
-from .TodoBotClient import TodoBotClient
+from . import custom_client,commands
+
+
 import os
 
 load_dotenv()
-bot_token: str | None = os.getenv("BOT_TOKEN")
 
-if bot_token is None:
-    print("Bot token identification not provided")
-    exit(1)
+bot_token: str = os.getenv("BOT_TOKEN")
+app_id: int = int(os.getenv("APPLICATION_ID"))
 
+intent = discord.Intents.default()
+intent.message_content = True
 
-intent=Intents(message_content=True)
-client=TodoBotClient(intents=intent)
+client = custom_client.TodoBotClient(intents=intent,application_id=app_id,command_prefix='/')
+
+for mem in inspect.getmembers(commands):
+    name,obj=mem
+    if name.startswith('bot_') and isinstance(obj,discord.app_commands.Command):
+        client.tree.add_command(obj)
+
 client.run(bot_token)
