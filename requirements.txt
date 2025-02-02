@@ -1,3 +1,4 @@
 pip~=24.0
 discord.py~=2.4.0
-python-dotenv
+python-dotenv~=1.0.0
+peewee~=3.17.0

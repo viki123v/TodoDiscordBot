@@ -2,6 +2,7 @@ import discord
 import inspect
 from dotenv import load_dotenv
 from . import custom_client,commands
+from . import domain
 
 
 import os
