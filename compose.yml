@@ -1,0 +1,12 @@
+services:
+  db:
+    container_name: todo_bot_storage
+    image: postgres:latest
+    env_file:
+      - ./.env
+    ports:
+      - "6000:5432"
+    volumes:
+      - ./DDL:/DDL
+    command: postgres && psql -U ${POSTGRES_USER} -f /DDL/init.sql ${POSTGRES_DB}
+
