@@ -1,7 +1,7 @@
 import discord
 import inspect
 from dotenv import load_dotenv
-from . import custom_client,commands
+from . import custom_elements,commands
 from . import domain
 
 
@@ -15,7 +15,7 @@ app_id: int = int(os.getenv("APPLICATION_ID"))
 intent = discord.Intents.default()
 intent.message_content = True
 
-client = custom_client.TodoBotClient(intents=intent,application_id=app_id,command_prefix='/')
+client = custom_elements.TodoBotClient(intents=intent,application_id=app_id,command_prefix='/')
 
 for mem in inspect.getmembers(commands):
     name,obj=mem

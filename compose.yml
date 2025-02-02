@@ -8,5 +8,5 @@ services:
       - "6000:5432"
     volumes:
       - ./DDL:/DDL
-    command: postgres && psql -U ${POSTGRES_USER} -f /DDL/init.sql ${POSTGRES_DB}
+    command: postgres & sleep 2 &&  psql -U ${POSTGRES_USER} -f /DDL/init.sql ${POSTGRES_DB}
 

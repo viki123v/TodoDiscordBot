@@ -38,6 +38,10 @@ class Task(Model):
                             max_length=100,
                             column_name='assignee')
 
+    @staticmethod
+    def get_tasks_for_project(project_name : str, server_name: str):
+        return Task.select().where((Task.project_name == project_name) & (Task.server_name == server_name))
+
     class Meta:
         database = db_con
         primary_key = CompositeKey('name','server_name','project_name')
