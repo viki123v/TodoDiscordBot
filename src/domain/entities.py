@@ -29,7 +29,7 @@ class Task(Model):
 
     project_name=ForeignKeyField(Project,
                                  to_field='name',
-                                 lazy=False,
+                                 lazy_load=False,
                                  null=False,
                                  column_name='project_name'
                                  )

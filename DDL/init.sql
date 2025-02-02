@@ -1,6 +1,6 @@
 create table projects(
     name varchar(200) NOT NULL,
-    server_name varchar(200) UNIQUE NOT NULL,
+    server_name varchar(200) NOT NULL,
     PRIMARY KEY (name,server_name)
 );
 
