@@ -1,14 +1,20 @@
 from sqlite3 import IntegrityError
 import discord
 from typing import cast
+import peewee
 from discord import app_commands
+from mypy.nodes import Expression
+
 from src.custom_elements import  CreateTaskModal, DUPLICATED_PKEY, list_task_for_project_name, list_projects
 from src.domain.entities import *
-from src.embdedding_fac import DiscordEmbdeddingFac
+from src.utils import DiscordEmbdeddingFac, Cache, ProjectCache, TaskCache,check_if_query_empty
 from peewee import IntegrityError, DoesNotExist
 from src.input_checks import *
 
 FOREIGN_KEY_VIOLATION = 'FOREIGN KEY constraint failed'
+
+cache_pr=ProjectCache()
+cache_tasks=TaskCache()
 
 
 @app_commands.command(name='show-todo')
@@ -40,10 +46,15 @@ async def show(interaction: discord.Interaction):
 async def bot_add_project(interaction: discord.Interaction,project_name: str):
     try:
         Project.create(name=project_name, server_name=interaction.guild.name)
+
+        projects = list(cache_pr.filter(server_name=interaction.guild.name, current_name=None ))
+        projects.append(Project(name=project_name, server_name=interaction.guild.name))
+
+        cache_pr.clean()
         await interaction.response.send_message(
             embed=DiscordEmbdeddingFac.create_simple_dark_bg(
                 title='Projects:',
-                body=list_projects(interaction.guild.name)
+                body=list_projects(interaction.guild.name,cached=projects)
             ))
     except IntegrityError as e:
         if DUPLICATED_PKEY in str(e):
@@ -54,59 +65,70 @@ async def bot_add_project(interaction: discord.Interaction,project_name: str):
 @app_commands.command(name='list-projects')
 async def bot_list_projects(interaction: discord.Interaction):
     await interaction.response.send_message(
-        embed=DiscordEmbdeddingFac.create_simple_dark_bg(title='Projects:', body=list_projects(interaction.guild.name))
+        embed=DiscordEmbdeddingFac.create_simple_dark_bg(title='Projects:', body=list_projects(interaction.guild.name,cached=cache_pr.filter(server_name=interaction.guild.name, current_name=None)))
     )
-
 
 @app_commands.command(name='remove-project',description="Removes a given project")
 @app_commands.describe(project_name='The name of the project you want to remove')
 async def bot_remove_project(interaction: discord.Interaction, project_name: str):
     try:
-        projects:List[Project]=Project.select().where(Project.server_name == interaction.guild.name)
+        await check_if_query_empty(interaction,cache_pr)
 
-        filtered=[]
-        for project in projects:
-            if project.name == project_name:
-                Project.delete().where((Project.name==project.name) & (Project.server_name==project.server_name)).execute()
-            else:
-                filtered.append(project)
+        delete_marked=cache_pr.last[0]
+        filtered=[pr for pr in cache_pr.projects_for_server if pr.name!=delete_marked.name]
+
+        cache_pr.clean()
+        Project.delete().where((Project.name==project_name) & (Project.server_name == interaction.guild.name)).execute()
 
         await interaction.response.send_message(embed=DiscordEmbdeddingFac.create_simple_dark_bg(
             title='Projects',
-            body=list_projects(interaction.guild.name,cached=filtered)
+            body=list_projects(interaction.guild.name, cached=filtered)
         ))
-    except DoesNotExist:
-        interaction.response.send_message(
-            embed=DiscordEmbdeddingFac.create_error_message(body=f"The project {project_name} doesn't exist")
-        )
 
+        cache_pr.clean()
+    except ValueError as e:
+        ...
+
+@bot_remove_project.autocomplete("project_name")
+async def bot_remove_project_name(interaction: discord.Interaction, project_name: str):
+    return await cache_pr.filter_commands(interaction,project_name)
 
 @app_commands.command(name="list-tasks",description="Shows the tasks registered to a given project")
 async def bot_list_tasks(interaction: discord.Interaction, project_name: str):
-    await interaction.response.send_message(
-        embed=DiscordEmbdeddingFac.create_simple_dark_bg(
-            title=f"Project[{project_name}] tasks:",
-            body=list_task_for_project_name(interaction.guild.name, project_name)
+    try:
+        await check_if_query_empty(interaction,cache_pr)
+        await interaction.response.send_message(
+            embed=DiscordEmbdeddingFac.create_simple_dark_bg(
+                title=f"Project[{project_name}] tasks:",
+                body=list_task_for_project_name(interaction.guild.name, project_name)
+            )
         )
-    )
+    except IntegrityError as e:
+        ...
+
+@bot_list_tasks.autocomplete("project_name")
+async def bot_list_tasks_name(interaction: discord.Interaction, project_name: str):
+    return await cache_pr.filter_commands(interaction,project_name)
 
 @app_commands.command(name='add-task',description="Create a new task")
-async def bot_add_task(interaction: discord.Interaction,project_name: str):
+async def bot_add_task(interaction: discord.Interaction, project_name: str):
     try:
-        await check_if_project_exist(interaction, project_name)
+        await check_if_query_empty(interaction,cache_pr)
         await interaction.response.send_modal(
             CreateTaskModal(project_name=project_name)
         )
     except ValueError as e:
         print(str(e))
 
+@bot_add_task.autocomplete("project_name")
+async def bot_add_task_project_name(interaction: discord.Interaction, cur_str:str):
+    return await cache_pr.filter_commands(interaction,cur_str)
+
 
 @app_commands.command(name='mark-completed',description="Marks a task as completed and removes it")
 @app_commands.describe(project_name="The name of the project to which the task belongs",task_num="The order of the task that you completed")
 async def bot_mark_task_as_completed(interaction: discord.Interaction,project_name: str,task_num: int):
     try:
-        await check_if_project_exist(interaction, project_name)
-
         tasks:List[Task] = Task.get_tasks_for_project_ordered(server_name=interaction.guild.name, project_name=project_name)
 
         await check_tasks_num(tasks=tasks, interaction=interaction, task_num=task_num)
@@ -126,14 +148,20 @@ async def bot_mark_task_as_completed(interaction: discord.Interaction,project_na
     except ValueError as e:
         print(str(e))
 
+@bot_mark_task_as_completed.autocomplete("project_name")
+async def bot_mark_task_as_completed_project_name(interaction: discord.Interaction, project_name: str):
+    await cache_pr.filter_commands(interaction,project_name)
+
+@bot_mark_task_as_completed.autocomplete("task_num")
+async def bot_mark_task_as_completed_task_name(interaction: discord.Interaction, task_name: str):
+    raise NotImplementedError()
+
 @app_commands.command(name='edit-task',description="Edits a given task")
 @app_commands.describe(project_name='The name of the project to which the task belongs',task_num="The order of the task that you want edited")
 async def bot_edit_task(interaction: discord.Interaction, project_name: str,task_num: int,new_task_name: str ):
     try:
         new_task_name=new_task_name.strip()
         await is_empty_new_task_name(interaction, new_task_name)
-
-        await check_if_project_exist(interaction, project_name)
 
         tasks=Task.get_tasks_for_project_ordered(server_name=interaction.guild.name, project_name=project_name)
         await check_tasks_num(tasks=tasks, interaction=interaction, task_num=task_num)
@@ -161,8 +189,6 @@ async def bot_edit_task(interaction: discord.Interaction, project_name: str,task
 @app_commands.describe(project_name='The name of the project you want to assign',task_num='The task number you want to assign to the user with the username provided')
 async def bot_assign_task(interaction: discord.Interaction,project_name: str,task_num: int,member: discord.Member):
     try:
-        await check_if_project_exist(interaction, project_name)
-
         tasks=Task.get_tasks_for_project_ordered(server_name=interaction.guild.name, project_name=project_name)
         await check_tasks_num(tasks=tasks, interaction=interaction, task_num=task_num)
 
@@ -186,8 +212,6 @@ async def bot_assign_task(interaction: discord.Interaction,project_name: str,tas
 @app_commands.command(name='edit-assigment', description="Edits a given assigment" )
 async def bot_edit_assigment(interaction:discord.Interaction, project_name: str,task_num: int,new_mem: discord.Member|None ):
     try:
-        await check_if_project_exist(interaction, project_name)
-
         tasks = Task.get_tasks_for_project_ordered(server_name=interaction.guild.name, project_name=project_name)
         await check_tasks_num(tasks=tasks, interaction=interaction, task_num=task_num)
 

@@ -1,14 +1,18 @@
 from discord.ext.commands import Bot
 import discord
 from peewee import IntegrityError
-from .embdedding_fac import DiscordEmbdeddingFac
+from .utils import DiscordEmbdeddingFac
 from .domain.entities import Project, Task
 from typing import List,Tuple
+from src.utils import ProjectCache,TaskCache
+
+cache_pr=ProjectCache()
+cache_task=TaskCache()
 
 DUPLICATED_PKEY = 'duplicate key value'
 
 def list_projects(server_name: str, cached: List[Project]|None = None ) -> str:
-    projects: List[Project] | None = cached if cached is not None else Project.select().where(Project.server_name == server_name)
+    projects: List[Project] | None = cached if cached is not None else cache_pr.filter(server_name=server_name,current_name=None)
 
     if projects is None or len(projects) == 0:
         return "No projects found"
@@ -22,7 +26,7 @@ def list_task_for_project_name(server_name: str, project_name: str, cached: List
         return f'{task[0]}. {task[1].name} {username}'
 
     tasks: List[Task] | None = cached if cached is not None else \
-        Task.get_tasks_for_project_ordered(server_name=server_name, project_name=project_name)
+        cache_task.filter(server_name=server_name,project_name=project_name,task_name=None)
 
     if tasks is None or len(tasks) == 0:
         return "No tasks found"
