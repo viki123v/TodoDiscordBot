@@ -17,8 +17,8 @@ class Task(Model):
     assignee_username=CharField(null=True,max_length=100,column_name='assignee')
 
     @staticmethod
-    def get_tasks_for_project_ordered(project_name : str, server_name: str):
-        return Task.select().where((Task.project_name == project_name) & (Task.server_name == server_name)).order_by(Task.name)
+    def get_tasks_for_project(project_name : str, server_name: str):
+        return Task.select().where((Task.project_name == project_name) & (Task.server_name == server_name))
 
     class Meta:
         database = db_con

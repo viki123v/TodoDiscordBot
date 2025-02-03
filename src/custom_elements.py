@@ -1,37 +1,22 @@
 from discord.ext.commands import Bot
 import discord
 from peewee import IntegrityError
-from .utils import DiscordEmbdeddingFac
+from .embdedding_fac import DiscordEmbdeddingFac
 from .domain.entities import Project, Task
-from typing import List,Tuple
-from src.utils import ProjectCache,TaskCache
-
-cache_pr=ProjectCache()
-cache_task=TaskCache()
+from typing import List
 
 DUPLICATED_PKEY = 'duplicate key value'
 
-def list_projects(server_name: str, cached: List[Project]|None = None ) -> str:
-    projects: List[Project] | None = cached if cached is not None else cache_pr.filter(server_name=server_name,current_name=None)
 
-    if projects is None or len(projects) == 0:
-        return "No projects found"
-
-    return '\n'.join(map(lambda pr: '-' + pr.name, projects))
-
-
-def list_task_for_project_name(server_name: str, project_name: str, cached: List[Task]|None = None   ) -> str:
-    def to_string(task: Tuple[int,Task]) -> str:
-        username='' if task[1].assignee_username is None else f'({task[1].assignee_username})'
-        return f'{task[0]}. {task[1].name} {username}'
-
-    tasks: List[Task] | None = cached if cached is not None else \
-        cache_task.filter(server_name=server_name,project_name=project_name,task_name=None)
-
+def list_task_for_project_name(server_name: str, project_name: str ) -> str:
+    tasks: List[Task] | None = Task.select().where(
+        (Task.server_name == server_name) & (Task.project_name == project_name)
+    ).order_by(Task.name)
     if tasks is None or len(tasks) == 0:
         return "No tasks found"
-
-    return '\n'.join(map(to_string, enumerate(tasks)))
+    return '\n'.join(
+        map(lambda t: str(t[0]) + '. ' + t[1].name, enumerate(tasks))
+    )
 
 
 class TodoBotClient(Bot):
