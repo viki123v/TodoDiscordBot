@@ -14,6 +14,7 @@ app_id: int = int(os.getenv("APPLICATION_ID"))
 
 intent = discord.Intents.default()
 intent.message_content = True
+intent.members = True
 
 client = custom_elements.TodoBotClient(intents=intent,application_id=app_id,command_prefix='/')
 
