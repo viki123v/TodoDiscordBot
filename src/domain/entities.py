@@ -10,6 +10,10 @@ class Project(Model):
         primary_key = CompositeKey('server_name', 'name')
         table_name='projects'
 
+    @staticmethod
+    def get_for_server_name(server_name):
+        return Project.select().where(Project.server_name == server_name)
+
 class Task(Model):
     name = CharField(null=False,column_name='name',max_length=200)
     server_name=ForeignKeyField(Project,to_field='server_name',lazy_load=True,null=False,column_name='server_name')
@@ -18,7 +22,7 @@ class Task(Model):
 
     @staticmethod
     def get_tasks_for_project(project_name : str, server_name: str):
-        return Task.select().where((Task.project_name == project_name) & (Task.server_name == server_name))
+        return Task.select().where((Task.project_name == project_name) & (Task.server_name == server_name)).order_by(Task.name)
 
     class Meta:
         database = db_con

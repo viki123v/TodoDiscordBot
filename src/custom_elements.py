@@ -1,22 +1,24 @@
 from discord.ext.commands import Bot
 import discord
 from peewee import IntegrityError
-from .embdedding_fac import DiscordEmbdeddingFac
+from .utils import DiscordEmbdeddingFac
 from .domain.entities import Project, Task
-from typing import List
+from typing import List,Tuple
 
 DUPLICATED_PKEY = 'duplicate key value'
 
 
-def list_task_for_project_name(server_name: str, project_name: str ) -> str:
-    tasks: List[Task] | None = Task.select().where(
+def list_task_for_project_name(server_name: str, project_name: str,cached : List[Task]|None = None ) -> str:
+    def to_str(task: Tuple[int,Task]) -> str:
+        username = '' if task[1].assignee_username is None else f'({task[1].assignee_username})'
+        return str(task[0]) + '. ' + task[1].name + username
+
+    tasks: List[Task] | None = cached if cached is not None else Task.select().where(
         (Task.server_name == server_name) & (Task.project_name == project_name)
     ).order_by(Task.name)
     if tasks is None or len(tasks) == 0:
         return "No tasks found"
-    return '\n'.join(
-        map(lambda t: str(t[0]) + '. ' + t[1].name, enumerate(tasks))
-    )
+    return '\n'.join(map(to_str, enumerate(tasks)))
 
 
 class TodoBotClient(Bot):
