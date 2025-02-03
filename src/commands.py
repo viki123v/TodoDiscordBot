@@ -232,7 +232,8 @@ async def bot_assign_task(interaction: discord.Interaction,project_name: str,tas
         task_num-=1
 
         Task.update({Task.assignee_username : member.name}).where(
-            (Task.project_name == project_name) & (Task.server_name == interaction.guild.name)
+            (Task.project_name == project_name) & (Task.server_name == interaction.guild.name) &
+            (Task.name == tasks[task_num].name)
         ).execute()
 
         tasks[task_num].assignee_username=member.name
