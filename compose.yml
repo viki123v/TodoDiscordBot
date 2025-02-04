@@ -28,6 +28,8 @@ services:
     env_file:
       - ./.env
     image: todo_bot_img
+    ports:
+      - "5000:443"
     build:
       context: .
       dockerfile: ./src/Dockerfile
