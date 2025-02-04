@@ -1,6 +1,6 @@
 services:
-  db:
-    container_name: todo_bot_storage
+  db-dev:
+    container_name: todo_bot_storage_dev
     image: postgres:latest
     env_file:
       - ./.env
@@ -8,5 +8,30 @@ services:
       - "6000:5432"
     volumes:
       - ./DDL/init.sql:/docker-entrypoint-initdb.d/init.sql
-    command: postgres & sleep 2
-
+    profiles: [dev]
+  db-prod:
+    container_name: todo_bot_storage_prod
+    image: postgres:latest
+    env_file:
+      - ./.env
+    volumes:
+      - ./DDL/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}" ]
+      interval: 2s
+      start_period: 2s
+      timeout: 2s
+    profiles: [prod]
+  app:
+    profiles: [prod]
+    container_name: todo_bot
+    env_file:
+      - ./.env
+    image: todo_bot_img
+    build:
+      context: .
+      dockerfile: ./src/Dockerfile
+    depends_on:
+      db-prod:
+        condition: service_healthy
+        restart: true

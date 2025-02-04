@@ -1,10 +1,7 @@
-from sys import intern
-
 import discord
 import inspect
 from dotenv import load_dotenv
 from . import custom_elements,commands
-from . import domain
 
 
 import os
